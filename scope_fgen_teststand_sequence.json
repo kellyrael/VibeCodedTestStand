@@ -1,0 +1,77 @@
+{
+  "sequence_name": "ScopeFgenValidationSequence",
+  "adapter": "Python",
+  "module": "teststand_sequence",
+  "description": "Setup initializes the scope and function generator once, Main executes each generated test case with RMS and frequency limit checks, and Cleanup disconnects both devices.",
+  "groups": {
+    "Setup": [
+      {
+        "name": "Initialize Devices",
+        "type": "Action",
+        "module": "teststand_sequence",
+        "function": "initialize_devices",
+        "parameters": {
+          "scope_resource": "Locals.ScopeResource",
+          "fgen_resource": "Locals.FgenResource",
+          "log_dir": "Locals.LogDir"
+        },
+        "stores_result_as": "FileGlobals.SequenceContext"
+      }
+    ],
+    "Main": [
+      {
+        "name": "Get Test Cases",
+        "type": "Action",
+        "module": "teststand_sequence",
+        "function": "get_test_cases",
+        "parameters": {
+          "handle": "FileGlobals.SequenceContext.handle"
+        },
+        "stores_result_as": "Locals.TestCases"
+      },
+      {
+        "name": "For Each Test Case",
+        "type": "ForEach",
+        "items": "Locals.TestCases",
+        "steps": [
+          {
+            "name": "Run Case",
+            "type": "Action",
+            "module": "teststand_sequence",
+            "function": "run_case",
+            "parameters": {
+              "handle": "FileGlobals.SequenceContext.handle",
+              "case_index": "Locals.LoopItem.index"
+            },
+            "stores_result_as": "Locals.StepResult"
+          },
+          {
+            "name": "RMS Limit",
+            "type": "NumericLimitTest",
+            "measurement": "Locals.StepResult.measured_rms_v",
+            "low_limit": "Locals.StepResult.rms_low_limit_v",
+            "high_limit": "Locals.StepResult.rms_high_limit_v",
+            "units": "V RMS"
+          },
+          {
+            "name": "Frequency Limit",
+            "type": "NumericLimitTest",
+            "measurement": "Locals.StepResult.measured_frequency_hz",
+            "low_limit": "Locals.StepResult.frequency_low_limit_hz",
+            "high_limit": "Locals.StepResult.frequency_high_limit_hz",
+            "units": "Hz"
+          }
+        ]
+      }
+    ],
+    "Cleanup": [
+      {
+        "name": "Disconnect Devices",
+        "type": "Action",
+        "module": "teststand_sequence",
+        "function": "disconnect_devices"
+      }
+    ]
+  }
+}
+
