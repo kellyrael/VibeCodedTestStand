@@ -76,6 +76,7 @@ def _serialize_runtime(handle: str, runtime: SuiteRuntime) -> Dict[str, Any]:
         "scope_resource": runtime.scope_resource,
         "fgen_resource": runtime.fgen_resource,
         "mode": runtime.mode_tag,
+        "run_id": getattr(runtime, "run_id", ""),
         "log_dir": str(runtime.log_dir),
         "test_log_path": str(runtime.test_log_path),
         "limits": {
@@ -229,6 +230,16 @@ def run_main(
         )
 
     executions: List[CaseExecution] = []
+    runtime.systemlink_reporter.publish_test_run_status(
+        run_id=runtime.run_id,
+        status="running",
+        details={
+            "sequence_name": _SEQUENCE_NAME,
+            "scope_resource": runtime.scope_resource,
+            "fgen_resource": runtime.fgen_resource,
+            "case_count": len(runtime.cases),
+        },
+    )
     for index, case in enumerate(runtime.cases, start=1):
         executions.append(execute_test_case(runtime, case, index, limits=limits, emit_output=False))
 
@@ -236,6 +247,7 @@ def run_main(
     return {
         "sequence_name": _SEQUENCE_NAME,
         "handle": handle,
+        "run_id": runtime.run_id,
         "failures": failures,
         "passed": failures == 0,
         "case_count": len(executions),

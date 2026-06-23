@@ -17,6 +17,9 @@ logs/
 *.seq.bak
 *.tsflow
 
+# Environment / secrets
+.env
+
 # IDE
 .idea/
 .vscode/

@@ -62,6 +62,29 @@ python test_scope_with_fgen.py
 python -c "from teststand_sequence import setup_sequence, run_main, cleanup_sequence; ctx = setup_sequence(); summary = run_main(ctx['handle']); print(summary['passed'], summary['failures']); cleanup_sequence(ctx['handle'])"
 ```
 
+## SystemLink reporting (optional)
+
+The hardware harness and TestStand adapter now emit best-effort HTTP events for:
+
+- Test run state transitions (`running`, `passed`, `failed`)
+- Per-case state transitions
+- Asset utilization for `Scope1`/`FGEN1` (`in_use`, `available`)
+
+Set these environment variables before running tests:
+
+```powershell
+$env:SYSTEMLINK_TEST_EVENTS_URL = "https://<server>/api/test-events"
+$env:SYSTEMLINK_ASSET_UTILIZATION_URL = "https://<server>/api/asset-utilization"
+$env:SYSTEMLINK_API_KEY = "<api-key>"
+```
+
+Optional:
+
+```powershell
+$env:SYSTEMLINK_TIMEOUT_S = "5.0"
+$env:SYSTEMLINK_VERIFY_TLS = "true"
+```
+
 ## Notes
 
 - If NI hardware/driver is unavailable, enable **Simulation Mode** in the UI.
