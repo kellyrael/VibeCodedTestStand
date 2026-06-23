@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TSSequenceFile version="17.0" fileVersion="17.0.0">
+  <Header>
+    <TS:FileGlobals xmlns:TS="http://www.ni.com/TestStand">
+      <TS:PropertyObject>
+        <TS:Property Name="FileGlobals" Type="Container">
+          <TS:Property Name="UUTSerialNumber" Type="String" Value=""/>
+          <TS:Property Name="StationID" Type="String" Value="Station_01"/>
+        </TS:Property>
+      </TS:PropertyObject>
+    </TS:FileGlobals>
+  </Header>
+
+  <Sequence name="MainSequence" index="0">
+
+    <!-- ============================================================ -->
+    <!--  SETUP GROUP — Power-on and connection verification          -->
+    <!-- ============================================================ -->
+    <Steps group="Setup">
+
+      <Step name="Initialize Instrument" stepType="Action" index="0">
+        <Description>Open VISA session and reset the instrument to a known state.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Open VISA session and reset the instrument to a known state."/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\instrument_control.py</ModulePath>
+          <FunctionName>initialize_instrument</FunctionName>
+          <Parameters>
+            <Parameter name="resource_name" type="String" value="GPIB0::5::INSTR"/>
+          </Parameters>
+        </CodeModule>
+      </Step>
+
+      <Step name="Verify Instrument Identity" stepType="PassFailTest" index="1">
+        <Description>Query *IDN? and confirm the instrument model string is correct.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Query *IDN? and confirm the instrument model string is correct."/>
+          <TS:Property Name="Result.PassFail" Type="Boolean" Value="False"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\instrument_control.py</ModulePath>
+          <FunctionName>verify_identity</FunctionName>
+          <Parameters>
+            <Parameter name="expected_model" type="String" value="Agilent 34401A"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <!-- PassFailTest: code module must set RunState.Sequence.Parameters.Result = True/False -->
+        </Limits>
+      </Step>
+
+    </Steps>
+
+    <!-- ============================================================ -->
+    <!--  MAIN GROUP — Electrical measurements                        -->
+    <!-- ============================================================ -->
+    <Steps group="Main">
+
+      <!-- ── DC Voltage ─────────────────────────────────────────── -->
+      <Step name="Measure DC Supply Voltage" stepType="NumericLimitTest" index="0">
+        <Description>Measure the 5 V DC rail with a 4-wire Kelvin connection.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Measure the 5 V DC rail with a 4-wire Kelvin connection."/>
+          <TS:Property Name="Result.Numeric" Type="Number" Value="0"/>
+          <TS:Property Name="Result.Units"   Type="String" Value="V"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>measure_dc_voltage</FunctionName>
+          <Parameters>
+            <Parameter name="channel"   type="String" value="CH1"/>
+            <Parameter name="range_v"   type="Number" value="10.0"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <Limit>
+            <LimitType>GELE</LimitType>       <!-- GreaterOrEqual / LessOrEqual -->
+            <LowLimit>4.75</LowLimit>
+            <HighLimit>5.25</HighLimit>
+            <Units>V</Units>
+          </Limit>
+        </Limits>
+      </Step>
+
+      <!-- ── DC Current ─────────────────────────────────────────── -->
+      <Step name="Measure DC Supply Current" stepType="NumericLimitTest" index="1">
+        <Description>Measure quiescent current draw on the 5 V rail.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Measure quiescent current draw on the 5 V rail."/>
+          <TS:Property Name="Result.Numeric" Type="Number" Value="0"/>
+          <TS:Property Name="Result.Units"   Type="String" Value="mA"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>measure_dc_current</FunctionName>
+          <Parameters>
+            <Parameter name="channel"    type="String" value="CH1"/>
+            <Parameter name="range_ma"   type="Number" value="500.0"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <Limit>
+            <LimitType>GELE</LimitType>
+            <LowLimit>50.0</LowLimit>
+            <HighLimit>300.0</HighLimit>
+            <Units>mA</Units>
+          </Limit>
+        </Limits>
+      </Step>
+
+      <!-- ── Resistance ─────────────────────────────────────────── -->
+      <Step name="Measure Load Resistance" stepType="NumericLimitTest" index="2">
+        <Description>4-wire resistance measurement of the primary load path.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="4-wire resistance measurement of the primary load path."/>
+          <TS:Property Name="Result.Numeric" Type="Number" Value="0"/>
+          <TS:Property Name="Result.Units"   Type="String" Value="Ohm"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>measure_resistance</FunctionName>
+          <Parameters>
+            <Parameter name="four_wire" type="Boolean" value="True"/>
+            <Parameter name="range_ohm" type="Number"  value="1000.0"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <Limit>
+            <LimitType>GELE</LimitType>
+            <LowLimit>90.0</LowLimit>
+            <HighLimit>110.0</HighLimit>
+            <Units>Ohm</Units>
+          </Limit>
+        </Limits>
+      </Step>
+
+      <!-- ── AC Voltage (RMS) ───────────────────────────────────── -->
+      <Step name="Measure AC Ripple Voltage" stepType="NumericLimitTest" index="3">
+        <Description>Measure AC ripple on the DC rail; must stay below 50 mV RMS.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Measure AC ripple on the DC rail; must stay below 50 mV RMS."/>
+          <TS:Property Name="Result.Numeric" Type="Number" Value="0"/>
+          <TS:Property Name="Result.Units"   Type="String" Value="mV"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>measure_ac_voltage_rms</FunctionName>
+          <Parameters>
+            <Parameter name="channel"   type="String" value="CH1"/>
+            <Parameter name="range_mv"  type="Number" value="100.0"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <Limit>
+            <LimitType>LE</LimitType>         <!-- LessOrEqual only — upper bound -->
+            <HighLimit>50.0</HighLimit>
+            <Units>mV</Units>
+          </Limit>
+        </Limits>
+      </Step>
+
+      <!-- ── Continuity / Short-circuit check ──────────────────── -->
+      <Step name="Continuity Check" stepType="PassFailTest" index="4">
+        <Description>Verify continuity on all signal pins against the netlist.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Verify continuity on all signal pins against the netlist."/>
+          <TS:Property Name="Result.PassFail" Type="Boolean" Value="False"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>check_continuity</FunctionName>
+          <Parameters>
+            <Parameter name="netlist_file" type="String" value=".\netlists\board_rev_A.csv"/>
+            <Parameter name="threshold_ohm" type="Number" value="5.0"/>
+          </Parameters>
+        </CodeModule>
+      </Step>
+
+      <!-- ── Insulation resistance ──────────────────────────────── -->
+      <Step name="Insulation Resistance Test" stepType="NumericLimitTest" index="5">
+        <Description>Apply 500 V DC hipot and measure insulation resistance.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Apply 500 V DC hipot and measure insulation resistance."/>
+          <TS:Property Name="Result.Numeric" Type="Number" Value="0"/>
+          <TS:Property Name="Result.Units"   Type="String" Value="MOhm"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>measure_insulation_resistance</FunctionName>
+          <Parameters>
+            <Parameter name="test_voltage_v" type="Number" value="500.0"/>
+            <Parameter name="dwell_s"        type="Number" value="1.0"/>
+          </Parameters>
+        </CodeModule>
+        <Limits>
+          <Limit>
+            <LimitType>GE</LimitType>         <!-- GreaterOrEqual only — lower bound -->
+            <LowLimit>100.0</LowLimit>
+            <Units>MOhm</Units>
+          </Limit>
+        </Limits>
+      </Step>
+
+      <!-- ── Thermal / over-temperature flag ───────────────────── -->
+      <Step name="Over-Temperature Flag Check" stepType="PassFailTest" index="6">
+        <Description>Confirm that the OTP (over-temperature protection) flag is NOT asserted.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Confirm that the OTP (over-temperature protection) flag is NOT asserted."/>
+          <TS:Property Name="Result.PassFail" Type="Boolean" Value="False"/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\measurements.py</ModulePath>
+          <FunctionName>check_otp_flag</FunctionName>
+          <Parameters>
+            <Parameter name="register_address" type="String" value="0x1F"/>
+            <Parameter name="bit_mask"         type="String" value="0x04"/>
+            <Parameter name="expected_state"   type="Boolean" value="False"/>
+          </Parameters>
+        </CodeModule>
+      </Step>
+
+    </Steps>
+
+    <!-- ============================================================ -->
+    <!--  CLEANUP GROUP — Power-down and session close                -->
+    <!-- ============================================================ -->
+    <Steps group="Cleanup">
+
+      <Step name="Power Down UUT" stepType="Action" index="0">
+        <Description>Disable power supply outputs before disconnecting the UUT.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Disable power supply outputs before disconnecting the UUT."/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\instrument_control.py</ModulePath>
+          <FunctionName>power_down</FunctionName>
+        </CodeModule>
+      </Step>
+
+      <Step name="Close Instrument Session" stepType="Action" index="1">
+        <Description>Close the VISA session and release instrument resources.</Description>
+        <StepProperties>
+          <TS:Property Name="Step.Description" Type="String"
+            Value="Close the VISA session and release instrument resources."/>
+        </StepProperties>
+        <CodeModule>
+          <Adapter>Python</Adapter>
+          <ModulePath>.\code_modules\instrument_control.py</ModulePath>
+          <FunctionName>close_instrument</FunctionName>
+        </CodeModule>
+      </Step>
+
+    </Steps>
+
+  </Sequence>
+</TSSequenceFile>

@@ -62,10 +62,22 @@ python test_scope_with_fgen.py
 python -c "from teststand_sequence import setup_sequence, run_main, cleanup_sequence; ctx = setup_sequence(); summary = run_main(ctx['handle']); print(summary['passed'], summary['failures']); cleanup_sequence(ctx['handle'])"
 ```
 
+## SystemLink Integration (Optional)
+
+Test results can be published to **NI SystemLink TestMonitor** for centralized tracking and analysis:
+
+```powershell
+# Publish test results to SystemLink TestMonitor
+python test_scope_with_fgen.py --publish-to-systemlink
+```
+
+See [`SYSTEMLINK_INTEGRATION.md`](./SYSTEMLINK_INTEGRATION.md) for detailed configuration and usage.
+
 ## Notes
 
 - If NI hardware/driver is unavailable, enable **Simulation Mode** in the UI.
 - The `test_scope_with_fgen.py` harness and `teststand_sequence.py` adapter run in **hardware-only mode** and fail fast if drivers/hardware are unavailable.
 - Device discovery is best-effort and still allows manual resource entry.
 - `measurement.log` is written in CSV-style lines for easy parsing.
+- SystemLink publishing is optional — tests run normally if SystemLink is unavailable.
 

@@ -279,9 +279,13 @@ class ScopeController:
     def disconnect(self) -> None:
         if self.session is not None:
             try:
+                self.session.abort()
+            except Exception:
+                pass
+            try:
                 self.session.close()
             except Exception:
-                self.loggers["error"].exception("Error while closing scope session")
+                pass
         self.session = None
         self.connected = False
         self.loggers["status"].info("Disconnected from scope.")
@@ -765,8 +769,13 @@ class ScopeApp(tk.Tk):
 
     def on_fgen_disconnect(self) -> None:
         if self.fgen_controller is not None:
-            self.fgen_controller.disconnect()
-            self.fgen_controller = None
+            try:
+                self.fgen_controller.disconnect()
+            except Exception as exc:
+                self.loggers["error"].warning("FGEN disconnect cleanup warning: %s", exc)
+            finally:
+                self.fgen_controller = None
+
         self.fgen_status_var.set("Disconnected")
         self._refresh_log_views()
 
@@ -799,20 +808,18 @@ class ScopeApp(tk.Tk):
         def _run() -> None:
             try:
                 from test_scope_with_fgen import run_test_suite
-                simulate = self.simulate_var.get() or niscope is None
                 scope_res = self.resource_var.get().strip() or "Scope1"
                 fgen_res  = self.fgen_resource_var.get().strip() or "FGEN1"
-                self.after(0, lambda: self.fgen_status_var.set("Test suite running…"))
+                self.after(0, lambda: self.fgen_status_var.set("Test suite running..."))
                 failures = run_test_suite(
                     scope_resource=scope_res,
                     fgen_resource=fgen_res,
-                    simulate=simulate,
                     log_dir=self.base_dir / "logs",
                 )
                 result_msg = (
-                    "Test suite complete — ALL PASSED ✓"
+                    "Test suite complete - ALL PASSED [OK]"
                     if failures == 0
-                    else f"Test suite done — {failures} FAILURE(S) ✗"
+                    else f"Test suite done - {failures} FAILURE(S) [FAIL]"
                 )
                 self.after(0, lambda: self.fgen_status_var.set(result_msg))
                 self.after(0, self._refresh_log_views)

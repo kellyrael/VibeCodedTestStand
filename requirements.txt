@@ -4,3 +4,4 @@ nifgen>=1.4.9
 nitclk>=1.4.9
 hightime>=1.0.0
 numpy>=1.20.0
+nisystemlink-clients>=2.20.0

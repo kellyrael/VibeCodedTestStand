@@ -39,6 +39,7 @@ from fgen import (
     TestResult,
     build_test_matrix,
 )
+from systemlink_reporter import create_reporter
 
 SETTLE_S = 0.25   # seconds to wait after FGEN output starts before acquiring
 HW_TOL   = 0.12   # 12% relative tolerance on hardware
@@ -298,7 +299,7 @@ def create_suite_runtime(
 def emit_suite_header(runtime: SuiteRuntime) -> None:
     hdr = (
         f"\n{runtime.separator}\n"
-        f" PXIe-5433 ({runtime.fgen_resource}) → PXIe-5162 ({runtime.scope_resource})  "
+        f" PXIe-5433 ({runtime.fgen_resource}) -> PXIe-5162 ({runtime.scope_resource})  "
         f"Test Suite  [{runtime.mode_tag}]\n"
         f"{runtime.separator}\n"
         f" {'#':>3}  {'Label':<45}  {'ExpRMS':>8}  {'PassRange':>17}  "
@@ -454,12 +455,13 @@ def emit_suite_summary(
     passed_n = sum(1 for execution in executions if execution.result.passed)
     total = len(executions)
 
+    result_label = "ALL PASS [OK]" if failures == 0 else f"{failures} FAILURE(S) [FAIL]"
     summary = (
         f"\n{runtime.separator}\n"
-        f"  Result : {'ALL PASS ✓' if failures == 0 else f'{failures} FAILURE(S) ✗'}\n"
+        f"  Result : {result_label}\n"
         f"  Passed : {passed_n} / {total}\n"
-        f"  Mode   : {runtime.mode_tag}  (RMS tolerance ±{limits.rms_tolerance * 100:.0f}% | "
-        f"Freq tolerance ±{limits.freq_tolerance * 100:.0f}%)\n"
+        f"  Mode   : {runtime.mode_tag}  (RMS tolerance +-{limits.rms_tolerance * 100:.0f}% | "
+        f"Freq tolerance +-{limits.freq_tolerance * 100:.0f}%)\n"
         f"  Log    : {runtime.test_log_path}\n"
         f"{runtime.separator}\n"
     )
@@ -493,8 +495,21 @@ def run_test_suite(
     log_dir: Path | None = None,
     rms_tolerance: Optional[float] = None,
     freq_tolerance: float = FREQ_TOL,
+    publish_to_systemlink: bool = True,
 ) -> int:
-    """Run the full test matrix.  Returns number of failures (0 = all passed)."""
+    """Run the full test matrix.  Returns number of failures (0 = all passed).
+    
+    Args:
+        scope_resource: Scope instrument resource name
+        fgen_resource: FGEN instrument resource name
+        log_dir: Directory for log files
+        rms_tolerance: RMS tolerance for pass/fail (optional override)
+        freq_tolerance: Frequency tolerance for pass/fail
+        publish_to_systemlink: If True, publish results to SystemLink TestMonitor
+    
+    Returns:
+        Number of failed test cases (0 = all passed)
+    """
     runtime = create_suite_runtime(
         scope_resource=scope_resource,
         fgen_resource=fgen_resource,
@@ -504,12 +519,55 @@ def run_test_suite(
     )
 
     executions: List[CaseExecution] = []
+    systemlink_reporter = None
+    
     try:
+        # Optionally initialize SystemLink reporter
+        if publish_to_systemlink:
+            systemlink_reporter = create_reporter(logger=runtime.loggers.get("status"))
+            if systemlink_reporter:
+                try:
+                    systemlink_reporter.connect()
+                except Exception as exc:
+                    runtime.loggers["error"].warning(
+                        "Failed to connect to SystemLink; proceeding without publishing: %s", exc
+                    )
+                    systemlink_reporter = None
+
         emit_suite_header(runtime)
         for idx, case in enumerate(runtime.cases, start=1):
             executions.append(execute_test_case(runtime, case, idx))
-        return emit_suite_summary(runtime, executions)
+
+        failures = sum(1 for e in executions if not e.result.passed)
+
+        # Publish results to SystemLink BEFORE printing summary so a print error cannot block it
+        if systemlink_reporter and executions:
+            try:
+                result_id = systemlink_reporter.publish_test_suite_result(
+                    suite_name=f"Scope/FGEN Validation - {scope_resource}/{fgen_resource}",
+                    scope_resource=scope_resource,
+                    fgen_resource=fgen_resource,
+                    executions=executions,
+                    passed=failures == 0,
+                )
+                print(f"  [SystemLink] Published result ID: {result_id}")
+                runtime.loggers["status"].info(
+                    "Test results published to SystemLink (Result ID: %s)", result_id
+                )
+            except Exception as exc:
+                print(f"  [SystemLink] Publish failed: {exc}")
+                runtime.loggers["error"].warning(
+                    "Failed to publish results to SystemLink: %s", exc
+                )
+
+        emit_suite_summary(runtime, executions)
+        return failures
     finally:
+        if systemlink_reporter:
+            try:
+                systemlink_reporter.disconnect()
+            except Exception:
+                pass
         cleanup_suite_runtime(runtime)
 
 
@@ -525,11 +583,14 @@ def main() -> int:
                         help="Scope resource name (default: Scope1)")
     parser.add_argument("--fgen",  default="FGEN1",  metavar="RESOURCE",
                         help="FGEN resource name  (default: FGEN1)")
+    parser.add_argument("--no-publish", action="store_true",
+                        help="Disable publishing test results to SystemLink TestMonitor")
     args = parser.parse_args()
 
     failures = run_test_suite(
         scope_resource=args.scope,
         fgen_resource=args.fgen,
+        publish_to_systemlink=not args.no_publish,
     )
     return 0 if failures == 0 else 1
 

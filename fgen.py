@@ -114,14 +114,25 @@ class FgenController:
             raise RuntimeError(f"FGEN connection failed: {exc}") from exc
 
     def disconnect(self) -> None:
-        self.stop_output()
+        try:
+            self.stop_output()
+        except Exception:
+            pass
+
         if self.session is not None:
+            try:
+                self.session.disable()
+            except Exception:
+                pass
+
             try:
                 self.session.close()
             except Exception:
-                self.loggers["error"].exception("Error closing FGEN session")
+                pass
+
         self.session = None
         self.connected = False
+        self.running = False
         self.loggers["status"].info("FGEN disconnected.")
 
     # ------------------------------------------------------------------
@@ -204,8 +215,9 @@ class FgenController:
         if self.session is not None:
             try:
                 self.session.abort()
-            except Exception:
-                self.loggers["error"].exception("FGEN stop_output failed")
+            except Exception as exc:
+                self.running = False
+                raise RuntimeError(f"FGEN stop failed: {exc}") from exc
         self.running = False
         self.loggers["status"].info("FGEN output STOPPED.")
 

@@ -1,0 +1,33 @@
+{
+  "services": [
+    {
+      "displayName": "TestStand Service",
+      "serviceClass": "ni.teststand.service",
+      "descriptionUrl": "",
+      "providedInterfaces": [
+        "ni.teststand.service"
+      ],
+      "path": "ni.teststand.service.exe",
+      "version": "9.20.0",
+      "annotations": {
+        "ni/service.description": "Service responsible for exposing the TestStand service API.",
+        "ni/service.collection": "NI.Nigel",
+        "ni/service.tags": [
+        ]
+      }
+    },
+    {
+      "displayName": "TestStand Service - HTTP API",
+      "serviceClass": "api/ts-service",
+      "descriptionUrl": "",
+      "providedInterfaces": [ "HTTPAPI" ],
+      "path": "ni.teststand.service.exe",
+      "version": "9.20.0",
+      "annotations": {
+        "ni/service.description": "Service responsible for exposing the TestStand service API.",
+        "ni/service.tags": [
+        ]
+      }
+    }
+  ]
+}
